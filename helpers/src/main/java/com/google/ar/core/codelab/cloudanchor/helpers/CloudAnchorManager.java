@@ -16,12 +16,22 @@
 
 package com.google.ar.core.codelab.cloudanchor.helpers;
 
+import android.util.DisplayMetrics;
+import android.util.Log;
+
 import com.google.ar.core.Anchor;
 import com.google.ar.core.Anchor.CloudAnchorState;
+import com.google.ar.core.Frame;
+import com.google.ar.core.Pose;
 import com.google.ar.core.Session;
+
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 
 /**
  * A helper class to handle all the Cloud Anchors logic, and add a callback-like mechanism on top of
@@ -34,8 +44,19 @@ public class CloudAnchorManager {
     /** This method is invoked when the results of a Cloud Anchor operation are available. */
     void onCloudTaskComplete(Anchor anchor);
   }
-
   private final HashMap<Anchor, CloudAnchorListener> pendingAnchors = new HashMap<>();
+
+  private Session arSession = null;
+  private Frame mFrame = null;
+  private Anchor mAnchor = null;
+  private Supplier<Frame> mFrameSupplier = null;
+
+  private float[] projmtx = new float[16];
+  private float[] viewmtx = new float[16];
+  private float[] mZeroMatrix = new float[16];
+  DisplayMetrics displayMetrics = new DisplayMetrics();
+  private float mScreenHeight = displayMetrics.heightPixels;
+  private float mScreenWidth = displayMetrics.widthPixels;
 
   /**
    * This method hosts an anchor. The {@code listener} will be invoked when the results are
@@ -43,7 +64,10 @@ public class CloudAnchorManager {
    */
   public synchronized void hostCloudAnchor(
       Session session, Anchor anchor, CloudAnchorListener listener) {
-    Anchor newAnchor = session.hostCloudAnchor(anchor);
+    Pose pose = mFrame.getCamera().getPose();
+    Anchor cameraAnchor = session.createAnchor(pose);
+    Anchor newAnchor = session.hostCloudAnchor(cameraAnchor);
+//    Anchor newAnchor = session.hostCloudAnchor(anchor);
     pendingAnchors.put(newAnchor, listener);
   }
 
@@ -59,11 +83,32 @@ public class CloudAnchorManager {
 
   /** Should be called after a {@link Session#update()} call. */
   public synchronized void onUpdate() {
+    mFrame = mFrameSupplier.get();
+
+    mFrame.getCamera().getProjectionMatrix(projmtx, 0, 0.001f,100.0f);
+    mFrame.getCamera().getViewMatrix(viewmtx, 0);
+
+    float[] position = new float[3];
+
+//    mFrame.getCamera().getPose().getTranslation(position, 0);
+    List<float[]> action = new ArrayList<float[]>();
+
+    if (mAnchor != null) {
+      float[] offset = PointUtils.TransformPointToPose(position, mAnchor.getPose());
+      Log.e("TAGGG", Arrays.toString(offset));
+    }
+//    float[] tapPoint = new float[2];
+//    tapPoint[0] = 0;
+//    tapPoint[1] = 0;
+//    float[] newPoint = PointUtils
+//            .GetWorldCoords(tapPoint, screenWidth, screenHeight, projmtx, viewmtx);
+
     Iterator<Map.Entry<Anchor, CloudAnchorListener>> iter = pendingAnchors.entrySet().iterator();
     while (iter.hasNext()) {
       Map.Entry<Anchor, CloudAnchorListener> entry = iter.next();
       Anchor anchor = entry.getKey();
       if (isReturnableState(anchor.getCloudAnchorState())) {
+        mAnchor = anchor;
         CloudAnchorListener listener = entry.getValue();
         listener.onCloudTaskComplete(anchor);
         iter.remove();
@@ -84,5 +129,12 @@ public class CloudAnchorManager {
       default:
         return true;
     }
+  }
+
+  public synchronized void getSession(Session session) {
+    arSession = session;
+  }
+  public synchronized void getFrameSupplier(Supplier<Frame> frameSupplier) {
+    mFrameSupplier = frameSupplier;
   }
 }
