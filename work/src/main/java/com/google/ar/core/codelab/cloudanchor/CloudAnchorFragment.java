@@ -108,6 +108,7 @@ public class CloudAnchorFragment extends ArFragment {
     cloudAnchorManager.getFrameSupplier(frameSupplier);
     cloudAnchorManager.setScreenHeight(mScreenHeight);
     cloudAnchorManager.setScreenWidth(mScreenWidth);
+    cloudAnchorManager.setViewConfig();
     arScene.addOnUpdateListener(frameTime -> cloudAnchorManager.onUpdate());
     setOnTapArPlaneListener((hitResult, plane, motionEvent) -> onArPlaneTap(hitResult));
     return rootView;

@@ -6,13 +6,6 @@ public class ViewConfig {
   private float left;
   private float right;
 
-  public ViewConfig(float top, float bottom, float left, float right) {
-    this.top = top;
-    this.bottom = bottom;
-    this.left = left;
-    this.right = right;
-  }
-
   public float getTop() {
     return top;
   }
@@ -27,5 +20,21 @@ public class ViewConfig {
 
   public float getRight() {
     return right;
+  }
+
+  public void setTop(float top) {
+    this.top = top;
+  }
+
+  public void setBottom(float bottom) {
+    this.bottom = bottom;
+  }
+
+  public void setLeft(float left) {
+    this.left = left;
+  }
+
+  public void setRight(float right) {
+    this.right = right;
   }
 }

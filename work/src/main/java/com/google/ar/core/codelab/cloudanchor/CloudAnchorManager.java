@@ -21,6 +21,7 @@ import com.google.ar.core.Anchor.CloudAnchorState;
 import com.google.ar.core.Frame;
 import com.google.ar.core.Session;
 import com.google.ar.core.codelab.cloudanchor.model.CloudViewFrustum;
+import com.google.ar.core.codelab.cloudanchor.model.ViewConfig;
 import com.google.ar.core.codelab.cloudanchor.model.ViewFrustum;
 import com.google.ar.core.codelab.cloudanchor.rendering.PointUtils;
 import com.google.ar.core.codelab.cloudanchor.rendering.SATUtils;
@@ -51,6 +52,8 @@ public class CloudAnchorManager {
 
   public static float NEARCLIP = 0.01f;
   public static float FARCLIP = 10.0f;
+  public static float HORIZONTALCLIPRATIO = 0.6f;
+  public static float VERTICALCLIPRATIO = 0.4f;
 
 
   private Session arSession;
@@ -58,6 +61,7 @@ public class CloudAnchorManager {
   private Anchor mAnchor;
   private Supplier<Frame> mFrameSupplier;
 
+  private ViewConfig mViewConfig = new ViewConfig();
   private ViewFrustum mViewFrustum = new ViewFrustum();
   private CloudViewFrustum mCloudViewFrustum = new CloudViewFrustum();
 
@@ -100,7 +104,7 @@ public class CloudAnchorManager {
 
 //    mFrame.getCamera().getPose().getTranslation(position, 0);
 
-    PointUtils.setFrustumWorldCoords(mViewFrustum, mScreenWidth, mScreenHeight, projmtx, viewmtx, NEARCLIP, FARCLIP);
+    PointUtils.setFrustumWorldCoords(mViewFrustum, mViewConfig, mScreenWidth, mScreenHeight, projmtx, viewmtx, NEARCLIP, FARCLIP);
     if (mAnchor != null) {
       PointUtils.transformFrustumCoords(mViewFrustum, mAnchor.getPose());
       List<Vector3f> normals = new ArrayList<>();
@@ -156,6 +160,17 @@ public class CloudAnchorManager {
     }
 
     return SATUtils.detectCollision(mViewFrustum, partnerCloudViewFrustum.getVertices(), partnerCloudViewFrustum.getNormals());
+  }
+
+  public void setViewConfig() {
+    float top = (1 - VERTICALCLIPRATIO) / 2 * mScreenHeight;
+    float bottom = (1 + VERTICALCLIPRATIO) / 2 * mScreenHeight;
+    float left = (1 - HORIZONTALCLIPRATIO) / 2 * mScreenWidth;
+    float right = (1 + HORIZONTALCLIPRATIO) / 2 * mScreenWidth;
+    mViewConfig.setTop(top);
+    mViewConfig.setBottom(bottom);
+    mViewConfig.setLeft(left);
+    mViewConfig.setRight(right);
   }
 
   public void setScreenHeight(float screenHeight) {
