@@ -20,6 +20,7 @@ import android.os.Bundle;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentManager;
 import android.support.v7.app.AppCompatActivity;
+import android.util.DisplayMetrics;
 
 /**
  * Main Activity for the Cloud Anchors Codelab.
@@ -30,7 +31,7 @@ import android.support.v7.app.AppCompatActivity;
 public class MainActivity extends AppCompatActivity {
 
   @Override
-  protected void onCreate(Bundle bundle) {
+  protected void  onCreate(Bundle bundle) {
     super.onCreate(bundle);
     setContentView(R.layout.activity_main);
 
@@ -38,6 +39,10 @@ public class MainActivity extends AppCompatActivity {
     Fragment frag = fm.findFragmentById(R.id.fragment_container);
     if (frag == null) {
       frag = new CloudAnchorFragment();
+      DisplayMetrics metrics = new DisplayMetrics();
+      getWindowManager().getDefaultDisplay().getMetrics(metrics);
+      ((CloudAnchorFragment) frag).setScreenHeight(metrics.heightPixels);
+      ((CloudAnchorFragment) frag).setScreenWidth(metrics.widthPixels);
       fm.beginTransaction().add(R.id.fragment_container, frag).commit();
     }
   }

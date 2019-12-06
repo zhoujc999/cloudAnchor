@@ -34,16 +34,17 @@ import com.google.ar.core.Config.CloudAnchorMode;
 import com.google.ar.core.Frame;
 import com.google.ar.core.HitResult;
 import com.google.ar.core.Session;
-import com.google.ar.core.codelab.cloudanchor.helpers.CloudAnchorManager;
-import com.google.ar.core.codelab.cloudanchor.helpers.FirebaseManager;
+import com.google.ar.core.codelab.FirebaseManager;
 import com.google.ar.core.codelab.cloudanchor.helpers.ResolveDialogFragment;
 import com.google.ar.core.codelab.cloudanchor.helpers.SnackbarHelper;
+import com.google.ar.core.codelab.cloudanchor.model.CloudViewFrustum;
 import com.google.ar.sceneform.AnchorNode;
 import com.google.ar.sceneform.Scene;
 import com.google.ar.sceneform.rendering.ModelRenderable;
 import com.google.ar.sceneform.ux.ArFragment;
 import com.google.ar.sceneform.ux.TransformableNode;
 
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
@@ -62,7 +63,12 @@ public class CloudAnchorFragment extends ArFragment {
   private final CloudAnchorManager cloudAnchorManager = new CloudAnchorManager();
   private final SnackbarHelper snackbarHelper = new SnackbarHelper();
   private FirebaseManager firebaseManager;
-  Supplier<Frame> frameSupplier = () -> getArSceneView().getArFrame();
+  private String mUserUid;
+  private float mScreenHeight = 0;
+  private float mScreenWidth = 0;
+  private Supplier<Frame> frameSupplier = () -> getArSceneView().getArFrame();
+  private Supplier<CloudViewFrustum> cloudFrustumSupplier = () -> cloudAnchorManager.getCloudViewFrustum();
+  private Consumer<String> getUserConsumer = userId -> getUserUid(userId);
 
   @Override
   @SuppressWarnings({"AndroidApiChecker", "FutureReturnValueIgnored"})
@@ -73,6 +79,8 @@ public class CloudAnchorFragment extends ArFragment {
         .build()
         .thenAccept(renderable -> andyRenderable = renderable);
     firebaseManager = new FirebaseManager(context);
+    firebaseManager.getCloudViewFrustumSupplier(cloudFrustumSupplier);
+    firebaseManager.login(getUserConsumer);
   }
 
   @Override
@@ -92,9 +100,14 @@ public class CloudAnchorFragment extends ArFragment {
     resolveButton = rootView.findViewById(R.id.resolve_button);
     resolveButton.setOnClickListener(v -> onResolveButtonPressed());
 
+    Button uploadButton = rootView.findViewById(R.id.detect_button);
+    uploadButton.setOnClickListener(v -> onDetectButtonPressed());
+
     arScene = getArSceneView().getScene();
     cloudAnchorManager.getSession(getArSceneView().getSession());
     cloudAnchorManager.getFrameSupplier(frameSupplier);
+    cloudAnchorManager.setScreenHeight(mScreenHeight);
+    cloudAnchorManager.setScreenWidth(mScreenWidth);
     arScene.addOnUpdateListener(frameTime -> cloudAnchorManager.onUpdate());
     setOnTapArPlaneListener((hitResult, plane, motionEvent) -> onArPlaneTap(hitResult));
     return rootView;
@@ -125,6 +138,7 @@ public class CloudAnchorFragment extends ArFragment {
   private synchronized void onResolvedAnchorAvailable(Anchor anchor, int shortCode) {
     CloudAnchorState cloudState = anchor.getCloudAnchorState();
     if (cloudState == CloudAnchorState.SUCCESS) {
+      onPaired(shortCode);
       snackbarHelper.showMessage(getActivity(), "Cloud Anchor Resolved. Short code: " + shortCode);
       setNewAnchor(anchor);
     } else {
@@ -151,6 +165,25 @@ public class CloudAnchorFragment extends ArFragment {
         getArSceneView().getSession(), anchor, this::onHostedAnchorAvailable);
   }
 
+  /*
+   * Most important Function
+   */
+  private synchronized void onPaired(int shortCode) {
+    firebaseManager.storeUid(shortCode);
+    firebaseManager.setPartnerListener();
+    firebaseManager.storeRequestUpdate();
+    firebaseManager.setRequestUpdateListener();
+    firebaseManager.setPartnerCloudViewFrustumListener(cloudViewFrustum -> {
+      boolean result = cloudAnchorManager.detectCollision(cloudViewFrustum);
+      if (result) {
+        snackbarHelper.showMessage(getActivity(), "Field of view overlapped!");
+      }
+      else {
+        snackbarHelper.showMessage(getActivity(), "No overlap!");
+      }
+    });
+  }
+
   private synchronized void onHostedAnchorAvailable(Anchor anchor) {
     CloudAnchorState cloudState = anchor.getCloudAnchorState();
     if (cloudState == CloudAnchorState.SUCCESS) {
@@ -158,6 +191,7 @@ public class CloudAnchorFragment extends ArFragment {
       firebaseManager.nextShortCode(shortCode -> {
         if (shortCode != null) {
           firebaseManager.storeUsingShortCode(shortCode, cloudAnchorId);
+          onPaired(shortCode);
           snackbarHelper
               .showMessage(getActivity(), "Cloud Anchor Hosted. Short code: " + shortCode);
         } else {
@@ -179,6 +213,12 @@ public class CloudAnchorFragment extends ArFragment {
     resolveButton.setEnabled(true);
     setNewAnchor(null);
   }
+
+
+  private synchronized void onDetectButtonPressed() {
+    firebaseManager.requestPartnerToUpdate();
+  }
+
 
   // Modify the renderables when a new anchor is available.
   private synchronized void setNewAnchor(@Nullable Anchor anchor) {
@@ -211,4 +251,18 @@ public class CloudAnchorFragment extends ArFragment {
     config.setCloudAnchorMode(CloudAnchorMode.ENABLED);
     return config;
   }
+
+  public void setScreenHeight(float screenHeight) {
+    mScreenHeight = screenHeight;
+  }
+  public void setScreenWidth(float screenWidth) {
+    mScreenWidth = screenWidth;
+  }
+
+
+  public void getUserUid(String userUid) {
+    mUserUid = userUid;
+  }
+
+
 }
